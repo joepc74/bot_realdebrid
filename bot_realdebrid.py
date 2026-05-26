@@ -1,4 +1,4 @@
-import os, asyncio, re
+import os, asyncio, re, sys
 from rdapi import RD
 from dotenv import load_dotenv
 from telebot import asyncio_filters
@@ -14,6 +14,25 @@ bot = AsyncTeleBot(telegram_token)
 RD = RD()
 # print(RD.system.time().content)
 # print(RD.user.get().json())
+log='-log' in sys.argv
+
+torrents_en_descarga = []
+async def tarea_de_descargas():
+    while True:
+        for torrent in torrents_en_descarga:
+            info=RD.torrents.info(id=torrent['torrent']['id']).json()
+            if log:
+                print(info)
+            if ('status' in info) and (info['status']=='downloaded'):
+                torrents_en_descarga.remove(torrent)
+                await bot.send_message(superuser, f"✅ Descarga completada: {info['filename']}\nEnlaces:\n" + '\n'.join(info['links']))
+        await asyncio.sleep(120)  # Esperar 120 segundos antes de verificar nuevamente
+
+# Handle /fin command
+@bot.message_handler(commands=['fin'])
+async def comando_fin(message):
+    if (message.chat.id==superuser):
+        exit()
 
 # handle torrent files
 @bot.message_handler(func=lambda message: True, content_types=['document'])
@@ -27,6 +46,15 @@ async def subir_torrent(message):
             new_file.write(downloaded_file)
         atorrent=RD.torrents.add_file(filepath=message.document.file_name).json()
         RD.torrents.select_files(id=atorrent['id'], files='all')
+        info=RD.torrents.info(id=atorrent['id']).json()
+        if log:
+            print(info)
+        if 'status' in info and info['status'] == 'downloaded':
+            await bot.send_message(message.chat.id, f"Archivo {info['filename']} subido y torrent añadido a RealDebrid. La descarga ya está completada.\nEnlaces:\n" + '\n'.join(info['links']))
+            os.remove(message.document.file_name)
+            return
+        else:
+            torrents_en_descarga.append({'torrent':atorrent,'user':message.chat.id})
         await bot.send_message(message.chat.id, f"Archivo '{message.document.file_name}' subido y torrent añadido a RealDebrid.")
         os.remove(message.document.file_name)
     else:
@@ -36,6 +64,9 @@ async def subir_torrent(message):
 @bot.message_handler(func=lambda message: True, content_types=['text'])
 async def handle_text(message):
     if (message.chat.id!=superuser):
+        return
+    if (message.text=='/fin'):
+        exit()
         return
     pattern = r'https?://\S+|www\.\S+'
     urls=re.findall(pattern, message.text)
@@ -58,18 +89,13 @@ async def handle_text(message):
     else:
         await bot.send_message(message.chat.id, "No se encontraron URLs en el mensaje.")
 
-# Handle /fin command
-@bot.message_handler(commands=['fin'])
-async def comando_fin(message):
-    if (message.chat.id==superuser):
-        exit()
-
 
 async def main():
     try:
         bot.add_custom_filter(asyncio_filters.StateFilter(bot))
         await bot.send_message(superuser, f"🟢 *Bot iniciado*",parse_mode='MarkdownV2',disable_notification=True)
         L = await asyncio.gather(
+            tarea_de_descargas(),
             # tareas_diarias(),
             # tareas_horarias(),
             bot.polling(non_stop=True)
