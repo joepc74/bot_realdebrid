@@ -1,3 +1,4 @@
 pyTelegramBotAPI
 python-dotenv
 rd_api_py
+myjdapi
