@@ -5,6 +5,7 @@ from telebot import asyncio_filters
 from telebot.types import *
 from telebot.async_telebot import AsyncTeleBot
 from telebot.asyncio_handler_backends import State, StatesGroup
+import myjdapi
 
 load_dotenv()  # Load environment variables from .env file
 telegram_token=os.getenv('TELEGRAM_TOKEN')
@@ -15,6 +16,17 @@ RD = RD()
 # print(RD.system.time().content)
 # print(RD.user.get().json())
 log='-log' in sys.argv
+jd=myjdapi.Myjdapi()
+
+
+def enviar_a_jd(links):
+    if jd.is_connected()==False:
+        jd.connect(os.getenv('JD_USER'),os.getenv('JD_PASSWORD'))
+        jd.update_devices()
+    devices=jd.list_devices()
+    device=jd.get_device(device_id=devices[0]['id'])
+    a=device.linkgrabber.add_links([{"autostart" : True, "links" : link, "destinationFolder" : 'RealDebrid'} for link in links])
+    print(a)
 
 torrents_en_descarga = []
 async def tarea_de_descargas():
@@ -26,6 +38,7 @@ async def tarea_de_descargas():
             if ('status' in info) and (info['status']=='downloaded'):
                 torrents_en_descarga.remove(torrent)
                 await bot.send_message(superuser, f"✅ Descarga completada: {info['filename']}\nEnlaces:\n" + '\n'.join(info['links']))
+                enviar_a_jd(info['links'])
         await asyncio.sleep(120)  # Esperar 120 segundos antes de verificar nuevamente
 
 # Handle /fin command
@@ -52,6 +65,7 @@ async def subir_torrent(message):
         if 'status' in info and info['status'] == 'downloaded':
             await bot.send_message(message.chat.id, f"Archivo {info['filename']} subido y torrent añadido a RealDebrid. La descarga ya está completada.\nEnlaces:\n" + '\n'.join(info['links']))
             os.remove(message.document.file_name)
+            enviar_a_jd(info['links'])
             return
         else:
             torrents_en_descarga.append({'torrent':atorrent,'user':message.chat.id})
