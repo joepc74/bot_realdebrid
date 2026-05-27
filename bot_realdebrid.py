@@ -37,8 +37,9 @@ async def tarea_de_descargas():
                 print(info)
             if ('status' in info) and (info['status']=='downloaded'):
                 torrents_en_descarga.remove(torrent)
-                await bot.send_message(superuser, f"✅ Descarga completada: {info['filename']}\nEnlaces:\n" + '\n'.join(info['links']))
+                msg=await bot.send_message(superuser, f"✅ Descarga completada: {info['filename']}\nEnlaces:\n" + '\n'.join(info['links']))
                 enviar_a_jd(info['links'])
+                await bot.edit_message_text(msg.text + "\n✅ Enlaces agregados a JDownloader." , msg.chat.id, msg.message_id)
         await asyncio.sleep(120)  # Esperar 120 segundos antes de verificar nuevamente
 
 # Handle /fin command
@@ -63,9 +64,10 @@ async def subir_torrent(message):
         if log:
             print(info)
         if 'status' in info and info['status'] == 'downloaded':
-            await bot.send_message(message.chat.id, f"Archivo {info['filename']} subido y torrent añadido a RealDebrid. La descarga ya está completada.\nEnlaces:\n" + '\n'.join(info['links']))
+            msg=await bot.send_message(message.chat.id, f"Archivo {info['filename']} subido y torrent añadido a RealDebrid. La descarga ya está completada.\nEnlaces:\n" + '\n'.join(info['links']))
             os.remove(message.document.file_name)
             enviar_a_jd(info['links'])
+            await bot.edit_message_text(msg.text + "\n✅ Enlaces agregados a JDownloader.",msg.chat.id, msg.message_id)
             return
         else:
             torrents_en_descarga.append({'torrent':atorrent,'user':message.chat.id})
