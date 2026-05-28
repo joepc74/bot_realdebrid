@@ -32,14 +32,17 @@ torrents_en_descarga = []
 async def tarea_de_descargas():
     while True:
         for torrent in torrents_en_descarga:
-            info=RD.torrents.info(id=torrent['torrent']['id']).json()
-            if log:
-                print(info)
-            if ('status' in info) and (info['status']=='downloaded'):
-                torrents_en_descarga.remove(torrent)
-                msg=await bot.send_message(superuser, f"✅ Descarga completada: {info['filename']}\nEnlaces:\n" + '\n'.join(info['links']))
-                enviar_a_jd(info['links'])
-                await bot.edit_message_text(msg.text + "\n✅ Enlaces agregados a JDownloader." , msg.chat.id, msg.message_id)
+            try:
+                info=RD.torrents.info(id=torrent['torrent']['id']).json()
+                if log:
+                    print(info)
+                if ('status' in info) and (info['status']=='downloaded'):
+                    torrents_en_descarga.remove(torrent)
+                    msg=await bot.send_message(superuser, f"✅ Descarga completada: {info['filename']}\nEnlaces:\n" + '\n'.join(info['links']))
+                    enviar_a_jd(info['links'])
+                    await bot.edit_message_text(msg.text + "\n✅ Enlaces agregados a JDownloader." , msg.chat.id, msg.message_id)
+            except Exception as e:
+                await bot.send_message(superuser, f"Error al verificar torrent {torrent['torrent']['id']}: {str(e)}")
         await asyncio.sleep(120)  # Esperar 120 segundos antes de verificar nuevamente
 
 # Handle /fin command
@@ -54,25 +57,28 @@ async def subir_torrent(message):
     if (message.chat.id!=superuser):
         return
     if message.document.file_name.endswith('.torrent'):
-        file_info = await bot.get_file(message.document.file_id)
-        downloaded_file = await bot.download_file(file_info.file_path)
-        with open(message.document.file_name, 'wb') as new_file:
-            new_file.write(downloaded_file)
-        atorrent=RD.torrents.add_file(filepath=message.document.file_name).json()
-        RD.torrents.select_files(id=atorrent['id'], files='all')
-        info=RD.torrents.info(id=atorrent['id']).json()
-        if log:
-            print(info)
-        if 'status' in info and info['status'] == 'downloaded':
-            msg=await bot.send_message(message.chat.id, f"Archivo {info['filename']} subido y torrent añadido a RealDebrid. La descarga ya está completada.\nEnlaces:\n" + '\n'.join(info['links']))
+        try:
+            file_info = await bot.get_file(message.document.file_id)
+            downloaded_file = await bot.download_file(file_info.file_path)
+            with open(message.document.file_name, 'wb') as new_file:
+                new_file.write(downloaded_file)
+            atorrent=RD.torrents.add_file(filepath=message.document.file_name).json()
+            RD.torrents.select_files(id=atorrent['id'], files='all')
+            info=RD.torrents.info(id=atorrent['id']).json()
+            if log:
+                print(info)
+            if 'status' in info and info['status'] == 'downloaded':
+                msg=await bot.send_message(message.chat.id, f"Archivo {info['filename']} subido y torrent añadido a RealDebrid. La descarga ya está completada.\nEnlaces:\n" + '\n'.join(info['links']))
+                os.remove(message.document.file_name)
+                enviar_a_jd(info['links'])
+                await bot.edit_message_text(msg.text + "\n✅ Enlaces agregados a JDownloader.",msg.chat.id, msg.message_id)
+                return
+            else:
+                torrents_en_descarga.append({'torrent':atorrent,'user':message.chat.id})
+            await bot.send_message(message.chat.id, f"Archivo '{message.document.file_name}' subido y torrent añadido a RealDebrid.")
             os.remove(message.document.file_name)
-            enviar_a_jd(info['links'])
-            await bot.edit_message_text(msg.text + "\n✅ Enlaces agregados a JDownloader.",msg.chat.id, msg.message_id)
-            return
-        else:
-            torrents_en_descarga.append({'torrent':atorrent,'user':message.chat.id})
-        await bot.send_message(message.chat.id, f"Archivo '{message.document.file_name}' subido y torrent añadido a RealDebrid.")
-        os.remove(message.document.file_name)
+        except Exception as e:
+            await bot.send_message(message.chat.id, f"Error al procesar el archivo: {str(e)}")
     else:
         await bot.send_message(message.chat.id, "Por favor, sube un archivo con extensión .torrent")
 
