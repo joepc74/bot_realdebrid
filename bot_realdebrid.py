@@ -20,9 +20,8 @@ jd=myjdapi.Myjdapi()
 
 
 def enviar_a_jd(links):
-    if jd.is_connected()==False:
-        jd.connect(os.getenv('JD_USER'),os.getenv('JD_PASSWORD'))
-        jd.update_devices()
+    jd.connect(os.getenv('JD_USER'),os.getenv('JD_PASSWORD'))
+    jd.update_devices()
     devices=jd.list_devices()
     device=jd.get_device(device_id=devices[0]['id'])
     a=device.linkgrabber.add_links([{"autostart" : True, "links" : link, "destinationFolder" : 'RealDebrid'} for link in links])
